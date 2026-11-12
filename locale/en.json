@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Device console",
+    "description": "Serial and SSH console panel: shows every command DSH runs with a Chinese annotation, supports pause/resume, and exposes console_* agent tools."
+  }
+}

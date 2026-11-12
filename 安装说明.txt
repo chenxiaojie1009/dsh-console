@@ -1,0 +1,75 @@
+设备控制台（dsh-console）安装说明
+====================================
+
+这是一个 DSH（DeepSeek Harness）桌面版插件：串口 / SSH 调试面板，
+DSH 执行的每条命令都会实时显示在面板里并附中文注释，可以随时暂停、改需求、再继续。
+
+一、装到本机或另一台 Windows DSH
+--------------------------------
+1. 关闭不需要，直接解压本压缩包到任意目录（例如 D:\dsh-console）。
+2. 打开 PowerShell，进入解压目录，运行：
+
+   .\install.ps1
+
+   默认安装到 desktop profile。其它 profile 用：
+
+   .\install.ps1 -Profile <profile名>
+
+   安装脚本实际执行：
+   dsh plugin --profile desktop add "file:<解压目录>\dsh-console-1.2.0.tgz"
+
+3. 重启 DSH 桌面端（必须重启一次，让新插件加载）。
+4. 左侧边栏底部出现「设备控制台」入口，点开即可使用。
+
+如果你更愿意让 DSH 自己装：把「让 DSH 安装这个插件」告诉另一台 DSH 的对话，
+并把 dsh-console-1.2.0.tgz 的路径给它，让它用 plugin_manager 的 install_bundle 安装。
+注意：install_bundle 直接指向“目录”时是 pnpm link，不会安装依赖；
+指向 .tgz 才会连同 serialport / ssh2 一起装好，推荐 tgz。
+
+二、卸载
+--------
+dsh plugin --profile desktop remove dsh-console
+然后重启 DSH。
+
+三、使用
+--------
+1. 面板「串口」页：选 COM 口、波特率（默认 115200 8N1）→ 连接。
+   连接成功后侧边栏图标出现绿点，面板顶部显示「已连接 · 串口 · COMx」。
+2. 面板「SSH」页：可选 DSH 里已配置的主机（来自 dsh-ssh.json），也可手填主机/端口/用户名，
+   输入密码 → 连接。密码只用于本次连接，不写会话记录、不给模型。
+3. 不想记命令时（推荐）：在面板左侧「告诉 DSH 你想做什么」写目的，例如
+   「看看 NAS 内存还剩多少」→ 点「让 DSH 给出命令」。
+   这一步直接用你 DSH 里配置的模型生成命令，不经过聊天会话；生成的命令进入
+   左侧「待确认命令」：› 命令   // 中文注释
+   点「执行」才会发到设备（点「取消」丢弃）；执行完自动补一行「解读：……」。
+   不想每次确认就取消勾选面板右上角「执行前确认」。
+   也可以回到对话直接说需求，效果一样。
+4. 面板右侧终端会显示：
+      › 命令    // 中文注释
+   设备输出，以及输出下面的：解读：……
+5. 要改需求：点面板右上角「暂停 DSH」→ DSH 当前操作立刻中断 → 在对话/面板左侧说新要求
+   → 点「继续」→ DSH 按新要求继续。
+6. 终端输入框可以直接手打命令发给设备（手打命令立即发送，不用确认）；Ctrl+C 按钮可中断
+   设备上跑的程序；清屏只清面板。注意：同一时间只保持一个连接，串口切 SSH（或反过来）
+   会先断开当前连接。
+
+四、常见问题
+------------
+- 看不到串口：设备管理器确认有 COM 口；面板点「刷新」；别被串口助手占用。
+- 提示串口模块不可用：说明装的是“目录链接”而不是 tgz，用 install.ps1 重装。
+- 安装时报 ERR_PNPM_IGNORED_BUILDS / @serialport/bindings-cpp：
+  先执行 dsh plugin --profile desktop approve-builds，再运行一次 install.ps1。
+- SSH 连不上：检查主机/端口/账号密码；部分设备禁用密码登录。
+- 重启前装好但侧边栏没有入口：确认重启了 DSH；确认 profile 对（默认 desktop）。
+- 每次 console_exec 都提示“CC Safety Net 未检查该命令”：这是 cc-safety-net 插件的提示，
+  在普通 PowerShell 里执行一次即可（console_exec 跑在串口/SSH 设备上，不是本机 shell）：
+    npx -y cc-safety-net rule tool add console_exec --no-cwd-arg
+- 面板左侧「让 DSH 给出命令」报错/没反应：这一步用你 DSH 里配置的模型，若提示没有可用模型，
+  去 DSH「设置 → 模型」登录或选择一个模型；提示模型调用失败则检查网络/额度后重试。
+
+五、文件说明
+------------
+dsh-console-1.2.0.tgz  插件包（真正被安装的东西）
+install.ps1            一键安装脚本
+README.md              完整文档（功能、工具、安全说明、排错）
+source\                插件源码（可修改后重新打包）

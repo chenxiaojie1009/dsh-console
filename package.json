@@ -1,0 +1,66 @@
+{
+  "name": "dsh-console",
+  "version": "1.2.0",
+  "description": "设备控制台 for DSH：串口与 SSH 调试面板，面板内模型按需求生成命令、执行前确认、实时中文注释与输出解读，可暂停/恢复，并提供 console_* agent 工具。Device console for DSH: serial/SSH panel with model-generated commands, run confirmation, live Chinese annotations and output explanations.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "host/*.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "LICENSE",
+    "install.ps1"
+  ],
+  "icon": "./icon.svg",
+  "keywords": [
+    "deepseek",
+    "harness",
+    "dsh",
+    "dsh-plugin",
+    "serial",
+    "ssh",
+    "console",
+    "terminal",
+    "serialport"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chenxiaojie1009/dsh-console.git"
+  },
+  "homepage": "https://github.com/chenxiaojie1009/dsh-console#readme",
+  "author": "chenxiaojie1009",
+  "engines": {
+    "node": ">=20"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-renderer"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.2.2-rc.1"
+  },
+  "dependencies": {
+    "serialport": "^13.0.0",
+    "ssh2": "^1.17.0"
+  },
+  "license": "MIT"
+}

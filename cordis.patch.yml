@@ -1,0 +1,9 @@
+# dsh-console bundle patch: inserts the dual-face plugin row into the profile.
+#
+# The node half (exports ".") runs in the host process: the serial/SSH console
+# engine, the /api/device-console route family, the console_* agent tools and a
+# system-prompt section. The `dsh.client` declaration in package.json makes the
+# browser half (exports "./client") load in the web GUI as the 设备控制台 panel.
+- insert:
+    - id: device-console
+      name: 'dsh-console'
