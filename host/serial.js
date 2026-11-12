@@ -3,6 +3,87 @@
  * lazily: the plugin must activate (panel, routes, tools) even on a machine
  * where the native binding cannot load, and report the failure on connect.
  */
+import { createRequire } from 'node:module'
+
+/** CJS require anchored at this module, used as the fallback loader. */
+const requireFromHere = createRequire(import.meta.url)
+
+/** Cached serialport module namespace. */
+let serialportModule
+
+/** Platform binding module and class name inside `@serialport/bindings-cpp`. */
+const PLATFORM_BINDING = {
+  win32: { file: 'win32', className: 'WindowsBinding' },
+  linux: { file: 'linux', className: 'LinuxBinding' },
+  darwin: { file: 'darwin', className: 'DarwinBinding' },
+}
+
+/**
+ * Build the `SerialPort` class from `@serialport/stream` plus the platform
+ * binding module directly.
+ *
+ * This is the same composition serialport's own `dist/serialport.js` performs,
+ * but without going through `serialport`'s index or the bindings-cpp index:
+ * some host module loaders return those aggregate re-exports without their
+ * spread exports (`autoDetect()` then yields `undefined`), while the direct
+ * subpath modules load correctly.
+ * @param {(id: string) => object} require CJS require anchored at this module.
+ * @returns {{SerialPort: Function}|undefined} a usable module subset.
+ */
+function composeSerialport(require) {
+  const platform = PLATFORM_BINDING[process.platform]
+  if (platform === undefined) return undefined
+  const stream = require('@serialport/stream')
+  if (stream === null || typeof stream !== 'object' || typeof stream.SerialPortStream !== 'function') return undefined
+  const bindingModule = require(`@serialport/bindings-cpp/dist/${platform.file}.js`)
+  const binding = bindingModule === null ? undefined : bindingModule[platform.className]
+  if (binding === null || typeof binding !== 'object' || typeof binding.list !== 'function') return undefined
+  class SerialPort extends stream.SerialPortStream {
+    static list = binding.list
+    static binding = binding
+    constructor(options, openCallback) {
+      super({ binding, ...options }, openCallback)
+    }
+  }
+  return { SerialPort }
+}
+
+/**
+ * Load serialport: ESM import, then CJS require, then the direct composition
+ * fallback for host loaders that break the package's aggregate re-exports.
+ * @returns {Promise<{SerialPort: object}>} the serialport module subset.
+ */
+async function loadSerialport() {
+  if (serialportModule !== undefined) return serialportModule
+  const problems = []
+  const pick = value =>
+    value !== null && typeof value === 'object' && typeof value.SerialPort === 'function' ? value : undefined
+  try {
+    const mod = await import('serialport')
+    serialportModule = pick(mod) ?? pick(mod?.default)
+  } catch (error) {
+    problems.push('import: ' + (error instanceof Error ? error.message : String(error)))
+  }
+  if (serialportModule === undefined) {
+    try {
+      serialportModule = pick(requireFromHere('serialport'))
+    } catch (error) {
+      problems.push('require: ' + (error instanceof Error ? error.message : String(error)))
+    }
+  }
+  if (serialportModule === undefined) {
+    try {
+      serialportModule = composeSerialport(requireFromHere)
+      if (serialportModule === undefined) problems.push('compose: 不支持的平台或缺少绑定模块')
+    } catch (error) {
+      problems.push('compose: ' + (error instanceof Error ? error.message : String(error)))
+    }
+  }
+  if (serialportModule === undefined) {
+    throw new Error('无法加载 serialport 模块（' + problems.join('；') + '）')
+  }
+  return serialportModule
+}
 
 /**
  * List serial ports available on this machine.
@@ -11,7 +92,7 @@
  */
 export async function listSerialPorts() {
   try {
-    const { SerialPort } = await import('serialport')
+    const { SerialPort } = await loadSerialport()
     const found = await SerialPort.list()
     return {
       ports: found.map(port => ({
@@ -95,7 +176,7 @@ export class SerialConnection {
    * @returns {Promise<SerialConnection>} the open connection.
    */
   static async open(options) {
-    const { SerialPort } = await import('serialport')
+    const { SerialPort } = await loadSerialport()
     const path = String(options.path)
     const baudRate = Number(options.baudRate ?? 115200)
     const dataBits = Number(options.dataBits ?? 8)

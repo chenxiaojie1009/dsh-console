@@ -5,6 +5,43 @@
  * One connection = one ssh2 Client + one interactive shell channel, so the
  * user and the agent see the same terminal.
  */
+import { createRequire } from 'node:module'
+
+/** CJS require anchored at this module, used as the fallback loader. */
+const requireFromHere = createRequire(import.meta.url)
+
+/** Cached ssh2 module namespace. */
+let ssh2Module
+
+/**
+ * Load ssh2 through ESM first and CJS `require` as a fallback (a host loader
+ * may hand a CommonJS package back with only a `default` export).
+ * @returns {Promise<{Client: object}>} the ssh2 module subset.
+ */
+async function loadSsh2() {
+  if (ssh2Module !== undefined) return ssh2Module
+  const problems = []
+  const pick = value => (value !== null && typeof value === 'object' && typeof value.Client === 'function' ? value : undefined)
+  try {
+    const mod = await import('ssh2')
+    ssh2Module = pick(mod) ?? pick(mod?.default)
+    if (ssh2Module === undefined) problems.push('import: 模块无 Client 导出')
+  } catch (error) {
+    ssh2Module = undefined
+    problems.push('import: ' + (error instanceof Error ? error.message : String(error)))
+  }
+  if (ssh2Module === undefined) {
+    try {
+      ssh2Module = pick(requireFromHere('ssh2'))
+      if (ssh2Module === undefined) problems.push('require: 模块无 Client 导出')
+    } catch (error) {
+      ssh2Module = undefined
+      problems.push('require: ' + (error instanceof Error ? error.message : String(error)))
+    }
+  }
+  if (ssh2Module === undefined) throw new Error('无法加载 ssh2 模块（' + problems.join('；') + '）')
+  return ssh2Module
+}
 
 /**
  * Deferred promise helper.
@@ -64,7 +101,7 @@ export class SshConnection {
    * @returns {Promise<SshConnection>} the open connection.
    */
   static async connect(options) {
-    const { Client } = await import('ssh2')
+    const { Client } = await loadSsh2()
     const host = String(options.host)
     const port = Number(options.port ?? 22)
     const username = String(options.username)
