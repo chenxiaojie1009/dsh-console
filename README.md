@@ -43,7 +43,7 @@ dsh plugin --profile desktop add "file:G:\path\to\dsh-console-1.2.0.tgz"
 ### 方式 C：从 GitHub 安装
 
 ```powershell
-dsh plugin --profile desktop add "file:https://github.com/chenxiaojie1009/dsh-console/releases/download/v1.2.0/dsh-console-1.2.0.tgz"
+dsh plugin --profile desktop add "https://github.com/chenxiaojie1009/dsh-console/releases/download/v1.2.0/dsh-console-1.2.0.tgz"
 ```
 
 或从 [Releases](https://github.com/chenxiaojie1009/dsh-console/releases) 下载 tgz 后用方式 A 安装；源码安装：`dsh plugin --profile desktop add "github:chenxiaojie1009/dsh-console"`（需要本地编译 `serialport`，较慢）。
