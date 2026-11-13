@@ -56,6 +56,8 @@ window.__ModuleLoader__.load({
       'btn.send': '发送',
       'btn.clear': '清屏',
       'btn.ctrlC': 'Ctrl+C',
+      'btn.enter': '回车',
+      'btn.space': '空格',
       'input.placeholder': '直接向设备发送命令，回车发送',
       'pending.title': 'DSH 请求连接 SSH',
       'pending.body': '请在下面输入密码并点击「连接」，连接成功后 DSH 会自动继续。',
@@ -75,7 +77,7 @@ window.__ModuleLoader__.load({
       'ask.title': '告诉 DSH 你想做什么',
       'ask.placeholder': '例如：看看 NAS 内存还剩多少 / 查看串口设备支持哪些命令',
       'ask.button': '让 DSH 给出命令',
-      'ask.hint': '不用记命令：写清目的，插件内模型会给出相关命令（不经过聊天）；命令要你点「执行」才发到设备，执行后自动生成中文解读。',
+      'ask.hint': '不用记命令：写清目的，回车提交（Shift+回车换行），插件内模型会给出命令；命令要你点「执行」才发到设备，执行后自动生成中文解读。',
       'ask.sent': '命令已生成，请在「待确认命令」里点「执行」。',
       'ask.empty': '请先写需求。',
       'confirm.label': '执行前确认',
@@ -121,6 +123,8 @@ window.__ModuleLoader__.load({
       'btn.send': 'Send',
       'btn.clear': 'Clear',
       'btn.ctrlC': 'Ctrl+C',
+      'btn.enter': 'Enter',
+      'btn.space': 'Space',
       'input.placeholder': 'Send a command to the device (Enter to send)',
       'pending.title': 'DSH requests an SSH connection',
       'pending.body': 'Enter the password below and click Connect; DSH continues automatically after the connection succeeds.',
@@ -540,6 +544,23 @@ details.dc-adv summary{cursor:pointer;font-size:12px;color:var(--dsw-alias-label
           })
         })
       }, [run])
+
+      /** Send one bare key (Enter / Space) to the device. */
+      const sendKey = useCallback(
+        (data, display, note) => {
+          void run(async () => {
+            await request('/send', {
+              method: 'POST',
+              body: JSON.stringify({ data, escape: true, echo: false, display, note }),
+            })
+          })
+        },
+        [run],
+      )
+
+      const sendEnter = useCallback(() => sendKey('\\r', '回车 (Enter)', '面板发送回车'), [sendKey])
+
+      const sendSpace = useCallback(() => sendKey(' ', '空格 (Space)', '面板发送空格'), [sendKey])
 
       const clearTranscript = useCallback(() => {
         void run(async () => {
@@ -964,7 +985,10 @@ details.dc-adv summary{cursor:pointer;font-size:12px;color:var(--dsw-alias-label
                 placeholder: t('ask.placeholder'),
                 onChange: event => setAskText(event.target.value),
                 onKeyDown: event => {
-                  if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) askDsh()
+                  if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent?.isComposing) {
+                    event.preventDefault()
+                    askDsh()
+                  }
                 },
               }),
               h(
@@ -1014,6 +1038,8 @@ details.dc-adv summary{cursor:pointer;font-size:12px;color:var(--dsw-alias-label
               }),
               h('button', { type: 'button', className: 'dc-btn primary', disabled: !connected || busy || input === '', onClick: sendInput }, t('btn.send')),
               h('button', { type: 'button', className: 'dc-btn', disabled: !connected || busy, onClick: sendCtrlC }, t('btn.ctrlC')),
+              h('button', { type: 'button', className: 'dc-btn', disabled: !connected || busy, onClick: sendEnter, title: '发送一个回车键' }, t('btn.enter')),
+              h('button', { type: 'button', className: 'dc-btn', disabled: !connected || busy, onClick: sendSpace, title: '发送一个空格键' }, t('btn.space')),
               h('button', { type: 'button', className: 'dc-btn', disabled: busy, onClick: clearTranscript }, t('btn.clear')),
             ),
             notice

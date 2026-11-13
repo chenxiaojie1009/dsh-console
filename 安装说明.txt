@@ -16,13 +16,13 @@ DSH 执行的每条命令都会实时显示在面板里并附中文注释，可�
    .\install.ps1 -Profile <profile名>
 
    安装脚本实际执行：
-   dsh plugin --profile desktop add "file:<解压目录>\dsh-console-1.3.1.tgz"
+   dsh plugin --profile desktop add "file:<解压目录>\dsh-console-1.3.2.tgz"
 
 3. 重启 DSH 桌面端（必须重启一次，让新插件加载）。
 4. 左侧边栏底部出现「设备控制台」入口，点开即可使用。
 
 如果你更愿意让 DSH 自己装：把「让 DSH 安装这个插件」告诉另一台 DSH 的对话，
-并把 dsh-console-1.3.1.tgz 的路径给它，让它用 plugin_manager 的 install_bundle 安装。
+并把 dsh-console-1.3.2.tgz 的路径给它，让它用 plugin_manager 的 install_bundle 安装。
 注意：install_bundle 直接指向“目录”时是 pnpm link，不会安装依赖；
 指向 .tgz 才会连同 serialport / ssh2 一起装好，推荐 tgz。
 
@@ -49,9 +49,10 @@ dsh plugin --profile desktop remove dsh-console
    设备输出，以及输出下面的：解读：……
 5. 要改需求：点面板右上角「暂停 DSH」→ DSH 当前操作立刻中断 → 在对话/面板左侧说新要求
    → 点「继续」→ DSH 按新要求继续。
-6. 终端输入框可以直接手打命令发给设备（手打命令立即发送，不用确认）；Ctrl+C 按钮可中断
-   设备上跑的程序；清屏只清面板。注意：同一时间只保持一个连接，串口切 SSH（或反过来）
-   会先断开当前连接。
+6. 终端输入框可以直接手打命令发给设备（手打命令立即发送，不用确认）；Ctrl+C 可中断设备上
+   跑的程序；「回车」/「空格」按钮会向设备单独发送一个回车键/空格键（适合串口菜单、需要
+   回车的提示、翻页等）；清屏只清面板。左侧需求框按回车直接提交，Shift+回车换行。
+   注意：同一时间只保持一个连接，串口切 SSH（或反过来）会先断开当前连接。
 
 四、常见问题
 ------------
@@ -69,7 +70,7 @@ dsh plugin --profile desktop remove dsh-console
 
 五、文件说明
 ------------
-dsh-console-1.3.1.tgz  插件包（真正被安装的东西）
+dsh-console-1.3.2.tgz  插件包（真正被安装的东西）
 install.ps1            一键安装脚本
 README.md              完整文档（功能、工具、安全说明、排错）
 source\                插件源码（可修改后重新打包）

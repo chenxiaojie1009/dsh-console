@@ -26,7 +26,7 @@ DSH（DeepSeek Harness）插件：把 **串口调试** 和 **SSH 登录** 变成
 ```powershell
 # 1. 解压 dsh-console-<version>.zip 到任意目录
 # 2. 安装到目标 profile（默认桌面版 profile 名为 desktop）
-dsh plugin --profile desktop add "file:G:\path\to\dsh-console-1.3.1.tgz"
+dsh plugin --profile desktop add "file:G:\path\to\dsh-console-1.3.2.tgz"
 # 3. 重启 DSH 桌面端
 ```
 
@@ -43,7 +43,7 @@ dsh plugin --profile desktop add "file:G:\path\to\dsh-console-1.3.1.tgz"
 ### 方式 C：从 GitHub 安装
 
 ```powershell
-dsh plugin --profile desktop add "https://github.com/chenxiaojie1009/dsh-console/releases/download/v1.3.1/dsh-console-1.3.1.tgz"
+dsh plugin --profile desktop add "https://github.com/chenxiaojie1009/dsh-console/releases/download/v1.3.2/dsh-console-1.3.2.tgz"
 ```
 
 或从 [Releases](https://github.com/chenxiaojie1009/dsh-console/releases) 下载 tgz 后用方式 A 安装；源码安装：`dsh plugin --profile desktop add "github:chenxiaojie1009/dsh-console"`（需要本地编译 `serialport`，较慢）。
@@ -75,7 +75,7 @@ dsh plugin --profile desktop remove dsh-console
    - 每条命令执行完，用 `console_note` 给输出补中文「解读」；
    - 面板里同步出现 `› 命令   // 注释`、设备输出，以及输出下面的 `解读：……`。
 6. 需要改需求：点面板右上角「暂停 DSH」。DSH 当前这一轮会被中断，命令等待也会立刻结束；你在对话或面板左侧说新的要求，点「继续」，DSH 再继续操作。
-7. 需要手动干预：终端输入框可以直接给设备发命令（手打命令立即发送，不需要确认），`Ctrl+C` 按钮可中断设备上正在跑的程序，「清屏」只清面板记录。
+7. 需要手动干预：终端输入框可以直接给设备发命令（手打命令立即发送，不需要确认）；`Ctrl+C` 可中断设备上正在跑的程序；`回车`/`空格` 按钮会向设备单独发送一个回车键/空格键（适合串口菜单、需要回车的提示、翻页等）；「清屏」只清面板记录。需求框里按回车直接提交，Shift+回车换行。
 
 > 同一时间只保持一个设备连接：从串口切到 SSH（或反过来）会先断开当前连接；面板顶部状态胶囊与侧边栏绿点反映的就是这个唯一连接。
 

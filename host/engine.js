@@ -633,6 +633,7 @@ export class ConsoleEngine {
    * @param {boolean} [options.echo] render the payload as a command line (panel input).
    * @param {boolean} [options.escape] expand `\\r`, `\\n`, `\\x03`, … (agent raw input).
    * @param {string} [options.lineEnding] line ending appended after the payload.
+   * @param {string} [options.display] transcript label for a bare key press (Enter / Space).
    * @returns {Promise<object>} outcome.
    */
   async send(options) {
@@ -647,9 +648,12 @@ export class ConsoleEngine {
     const note = options.note === undefined ? '' : String(options.note)
     if (options.echo === true) {
       this.hub.appendCommand(payload.replace(/[\r\n]+$/, ''), note)
+    } else if (typeof options.display === 'string' && options.display !== '') {
+      this.hub.appendCommand(options.display, note)
     } else {
       this.hub.appendCommand(`[原始数据] ${printable(payload)}`, note)
     }
+
     await connection.write(payload)
     return { ok: true, status: 'sent', data: printable(payload), note }
   }

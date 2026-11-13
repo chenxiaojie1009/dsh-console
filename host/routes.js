@@ -242,6 +242,7 @@ export function makeRoutes(deps) {
             note: body.note === undefined ? undefined : String(body.note),
             echo: body.echo === true,
             escape: body.escape === true,
+            display: body.display === undefined ? undefined : String(body.display),
             lineEnding: body.lineEnding === undefined ? undefined : String(body.lineEnding),
           })
           writeJson(response, 200, result)
