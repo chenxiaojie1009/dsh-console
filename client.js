@@ -66,6 +66,7 @@ window.__ModuleLoader__.load({
       'notice.resumed': '已恢复：DSH 可以继续操作设备了。',
       'notice.connected': '连接成功。',
       'notice.connectFailed': '连接失败：',
+      'notice.notConnected': '还没有连接设备：请先在面板连接串口或 SSH 再发送。',
       'notice.disconnected': '已断开连接。',
       'notice.pendingTimeout': 'SSH 尚未连接：请在上方输入密码并点「连接」。',
       'term.empty': '暂无输出。连接串口或 SSH 后，DSH 执行的命令、中文注释和设备输出会实时出现在这里。',
@@ -141,6 +142,7 @@ window.__ModuleLoader__.load({
       'notice.resumed': 'Resumed: DSH can operate the device again.',
       'notice.connected': 'Connected.',
       'notice.connectFailed': 'Connection failed: ',
+      'notice.notConnected': 'No device connected: connect a serial port or SSH first.',
       'notice.disconnected': 'Disconnected.',
       'notice.pendingTimeout': 'SSH is not connected: enter the password above and click Connect.',
       'term.empty': 'No output yet. Once a serial device or SSH host is connected, commands, annotations and device output appear here live.',
@@ -428,6 +430,23 @@ details.dc-adv summary{cursor:pointer;font-size:12px;color:var(--dsw-alias-label
       })
       const termRef = useRef(null)
       const passwordRef = useRef(null)
+      const inputRef = useRef(null)
+      const historyRef = useRef([])
+      const historyPosRef = useRef(-1)
+      const historyDraftRef = useRef('')
+
+      // Restore the command history kept in this browser.
+      useEffect(() => {
+        try {
+          const raw = window.localStorage.getItem('dsh-console-history-v1')
+          if (raw !== null) {
+            const list = JSON.parse(raw)
+            if (Array.isArray(list)) historyRef.current = list.filter(item => typeof item === 'string').slice(-100)
+          }
+        } catch {
+          // History is best-effort only.
+        }
+      }, [])
 
       const connected = view.session !== null
       const sessionKind = view.session ? view.session.kind : 'none'
@@ -540,9 +559,67 @@ details.dc-adv summary{cursor:pointer;font-size:12px;color:var(--dsw-alias-label
         })
       }, [run, view.paused, t])
 
+      /** Persist the browser-side command history (best effort). */
+      const saveHistory = () => {
+        try {
+          window.localStorage.setItem('dsh-console-history-v1', JSON.stringify(historyRef.current.slice(-100)))
+        } catch {
+          // Ignore private mode / quota failures.
+        }
+      }
+
+      /**
+       * Put a command in the terminal input, focus it and put the caret at the
+       * end so the user can edit or delete characters right away.
+       * @param {string} value command text.
+       */
+      const fillInput = useCallback(value => {
+        historyPosRef.current = -1
+        historyDraftRef.current = ''
+        setInput(value)
+        window.setTimeout(() => {
+          const node = inputRef.current
+          if (node === null || node === undefined) return
+          node.focus()
+          if (typeof node.setSelectionRange === 'function') node.setSelectionRange(value.length, value.length)
+        }, 0)
+      }, [])
+
+      /**
+       * Walk the sent-command history with ArrowUp / ArrowDown.
+       * @param {number} direction -1 for older, +1 for newer.
+       */
+      const navigateHistory = useCallback(direction => {
+        const list = historyRef.current
+        if (list.length === 0) return
+        const current = historyPosRef.current
+        if (current === -1) historyDraftRef.current = input
+        let next = current + direction
+        if (next < -1) next = -1
+        if (next > list.length - 1) next = list.length - 1
+        historyPosRef.current = next
+        setInput(next === -1 ? historyDraftRef.current : list[list.length - 1 - next])
+        window.setTimeout(() => {
+          const node = inputRef.current
+          if (node === null || node === undefined) return
+          node.focus()
+          if (typeof node.setSelectionRange === 'function') node.setSelectionRange(node.value.length, node.value.length)
+        }, 0)
+      }, [input])
+
       const sendInput = useCallback(() => {
         const data = input
         if (data === '') return
+        if (!connected) {
+          setNotice({ kind: 'warn', text: t('notice.notConnected') })
+          return
+        }
+        historyRef.current = historyRef.current.filter(item => item !== data)
+        historyRef.current.push(data)
+        while (historyRef.current.length > 100) historyRef.current.shift()
+        historyPosRef.current = -1
+        historyDraftRef.current = ''
+        saveHistory()
         setInput('')
         void run(async () => {
           await request('/send', {
@@ -554,7 +631,7 @@ details.dc-adv summary{cursor:pointer;font-size:12px;color:var(--dsw-alias-label
             }),
           })
         })
-      }, [input, run, sessionKind])
+      }, [input, run, sessionKind, connected, t])
 
       const sendCtrlC = useCallback(() => {
         void run(async () => {
@@ -1041,7 +1118,7 @@ details.dc-adv summary{cursor:pointer;font-size:12px;color:var(--dsw-alias-label
                       { key: row.key, className: 'dc-vendor-row' },
                       h('span', { className: 'dc-vendor-label' }, row.label),
                       h('code', { className: 'dc-vendor-cmd' }, row.command),
-                      h('button', { type: 'button', className: 'dc-btn', onClick: () => setInput(row.command) }, t('vendor.fill')),
+                      h('button', { type: 'button', className: 'dc-btn', onClick: () => fillInput(row.command) }, t('vendor.fill')),
                     ),
                   ),
                   h('div', { className: 'dc-hint' }, t('vendor.refHint')),
@@ -1099,12 +1176,26 @@ details.dc-adv summary{cursor:pointer;font-size:12px;color:var(--dsw-alias-label
               'div',
               { className: 'dc-inputrow' },
               h('input', {
+                ref: inputRef,
                 className: 'dc-input',
                 value: input,
                 placeholder: t('input.placeholder'),
-                disabled: !connected || busy,
-                onChange: event => setInput(event.target.value),
+                disabled: busy,
+                onChange: event => {
+                  historyPosRef.current = -1
+                  setInput(event.target.value)
+                },
                 onKeyDown: event => {
+                  if (event.key === 'ArrowUp') {
+                    event.preventDefault()
+                    navigateHistory(1)
+                    return
+                  }
+                  if (event.key === 'ArrowDown') {
+                    event.preventDefault()
+                    navigateHistory(-1)
+                    return
+                  }
                   if (event.key === 'Enter' && !event.nativeEvent?.isComposing && !event.isComposing) sendInput()
                 },
               }),
