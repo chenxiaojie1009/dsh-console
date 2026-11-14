@@ -304,7 +304,7 @@ export function makeRoutes(deps) {
             ok: true,
             suggestions: result.suggestions,
             reply: result.reply,
-            message: count > 0 ? `已生成 ${count} 条命令，请在「待确认命令」里点「执行」。` : '模型没有给出可执行的命令。',
+            message: count > 0 ? `已生成 ${count} 条命令，请在「待确认命令」里点「执行」。` : (result.message || '模型没有给出可执行的命令。'),
           })
         } catch (error) {
           fail(response, error)

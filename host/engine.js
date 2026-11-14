@@ -26,42 +26,63 @@ const MAX_WAIT_MS = 120_000
 const MAX_IDLE_MS = 10_000
 
 /** System prompt for turning a panel requirement into commands. */
-const SUGGEST_SYSTEM = `你是「设备控制台」里的串口/SSH 命令助手。根据用户需求、当前连接和最近的终端输出，给出要执行的命令。
+const SUGGEST_SYSTEM = `你是「设备控制台」里的串口/SSH 命令助手。根据用户需求、当前连接、交换机厂商和最近的终端输出，给出要执行的命令。
 
-只输出一个 JSON 数组，不要任何解释文字，格式：
-[{"command":"要执行的命令","note":"一句中文注释"}]
+只输出一个 JSON 对象，不要任何解释文字，格式：
+{"commands":[{"command":"要执行的命令","note":"一句中文注释"}],"message":"可选的一句话说明"}
 
 要求：
-1. 最多 3 条命令；命令要小、可验证、只读优先。不确定环境时先给一条探测命令（如 uname -a、docker --version），不要一次给一长串。
-2. 安装/删除/重启等修改性命令要单独给出，并在 note 里写明会做什么。
+1. commands 最多 3 条；命令要小、可验证、只读优先。不确定环境时先给一条探测命令，不要一次给一长串。
+2. 安装/删除/重启/配置变更等修改性命令要单独给出，并在 note 里写明会做什么。
 3. 不要编造输出；不知道的信息不要假设，用命令去查。
 4. note 是一句简短中文，说明这条命令的目的。
-5. 需求不适合用命令完成、或缺少关键信息时，输出 []（空数组），不要输出其它文字。
-6. 当前连接是交换机（串口 Console / SSH）时：必须使用上下文里给出的厂商命令语法，禁止混用其他厂商命令；厂商未识别时不要猜，输出 [] 并让用户先在面板选择厂商。
-7. 给交换机命令前，先用该厂商的查看版本命令确认型号（如 display version / show version），再给下一步命令。`
+5. message 只在 commands 为空或需要提醒用户时填写；有命令时可省略。
+6. 交换机场景：已识别厂商时只用该厂商命令语法（华为/H3C 用 display，思科/锐捷/TP-Link 用 show，Juniper 用 show，MikroTik 用 / 斜杠命令），禁止混用其他厂商语法。
+7. 交换机需求但厂商未识别时：commands 给空数组，message 写「请先在面板右上角「厂商」选择交换机品牌（或先连接设备回读版本号），再生成命令」。
+8. 不涉及交换机的需求（本机、NAS、Linux、Docker 等）正常给命令，不要因为厂商未识别就返回空。
+9. 当前未连接设备时：如果必须连上设备才能执行，commands 给空数组，message 提示先连接（串口或 SSH）；如果需求本身是连接/查看状态，则用 message 说明。
+10. 需求不适合用命令完成时，commands 给空数组，message 说明原因。`
 
 /** System prompt for explaining one command's output. */
 const EXPLAIN_SYSTEM =
   '你是「设备控制台」助手。用一句简洁中文解读下面的命令输出：关键结论、数值含义、异常或下一步提示。不超过 80 字，不要重复命令本身，不要编造输出里没有的内容。'
 
 /**
- * Parse the model's JSON array of command suggestions.
+ * Parse the model's command suggestions.
+ *
+ * Accepts both the current object form `{ commands, message }` and the older
+ * bare array form.
  * @param {string} reply model reply text.
- * @returns {Array<{command:string,note:string}>} at most 3 validated commands.
+ * @returns {{suggestions:Array<{command:string,note:string}>,message:string}} at most 3 commands plus an optional note.
  */
 export function parseSuggestions(reply) {
   const text = String(reply ?? '')
-  const match = text.match(/\[[\s\S]*\]/)
-  if (match === null) return []
-  let parsed
-  try {
-    parsed = JSON.parse(match[0])
-  } catch {
-    return []
+  const objectMatch = text.match(/\{[\s\S]*\}/)
+  const arrayMatch = text.match(/\[[\s\S]*\]/)
+  let raw
+  let message = ''
+  if (objectMatch !== null) {
+    try {
+      const parsed = JSON.parse(objectMatch[0])
+      if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed) && Array.isArray(parsed.commands)) {
+        raw = parsed.commands
+        message = typeof parsed.message === 'string' ? parsed.message.trim().slice(0, 300) : ''
+      }
+    } catch {
+      raw = undefined
+    }
   }
-  if (!Array.isArray(parsed)) return []
+  if (raw === undefined && arrayMatch !== null) {
+    try {
+      const parsed = JSON.parse(arrayMatch[0])
+      if (Array.isArray(parsed)) raw = parsed
+    } catch {
+      raw = undefined
+    }
+  }
+  if (!Array.isArray(raw)) return { suggestions: [], message }
   const result = []
-  for (const item of parsed) {
+  for (const item of raw) {
     if (result.length >= 3) break
     if (typeof item !== 'object' || item === null) continue
     const command = typeof item.command === 'string' ? item.command.trim() : ''
@@ -69,7 +90,7 @@ export function parseSuggestions(reply) {
     if (command === '') continue
     result.push({ command: command.slice(0, 500), note: note.slice(0, 200) })
   }
-  return result
+  return { suggestions: result, message }
 }
 
 /** Line-ending spellings accepted from tools and the panel. */
@@ -643,17 +664,30 @@ export class ConsoleEngine {
     const context = this.buildModelContext()
     this.hub.appendRequirement(value)
     const reply = await this.complete(SUGGEST_SYSTEM, `${context}\n用户需求：${value}`)
-    const suggestions = parseSuggestions(reply)
+    const parsed = parseSuggestions(reply)
+    const suggestions = parsed.suggestions
     if (suggestions.length === 0) {
-      const summary = String(reply ?? '').trim().slice(0, 300)
-      this.hub.appendSuggestion(summary === '' ? '模型没有给出可执行的命令，请换一种说法或补充信息。' : summary)
-      return { suggestions: [], reply: summary }
+      const fallback = parsed.message !== '' ? parsed.message : this.emptySuggestionMessage()
+      this.hub.appendSuggestion(fallback)
+      return { suggestions: [], reply: String(reply ?? '').trim().slice(0, 300), message: fallback }
     }
     this.hub.appendSuggestion(`根据需求给出 ${suggestions.length} 条命令，请在「待确认命令」里点「执行」。`)
     for (const item of suggestions) {
       this.hub.addPendingExec({ command: item.command, note: item.note, waitMs: 20_000, idleMs: 800 })
     }
-    return { suggestions, reply: '' }
+    return { suggestions, reply: '', message: parsed.message }
+  }
+
+  /**
+   * Explain an empty suggestion set using the current connection/vendor state,
+   * so the panel never shows a bare "no command" line.
+   * @returns {string} a user-facing explanation.
+   */
+  emptySuggestionMessage() {
+    const vendor = this.vendorInfo()
+    if (!this.connected) return '还没有连接设备：请先在面板选择串口/SSH 连接，再让我生成命令。'
+    if (vendor.id === UNKNOWN_VENDOR.id) return '当前还没有选择交换机厂商：请在面板右上角「厂商」里选择品牌（或等待设备回显自动识别），再让我生成命令。'
+    return '模型这次没有给出可执行的命令：请补充具体目标（例如要看版本的哪个部分、要改哪个接口），我再生成。'
   }
 
   /**

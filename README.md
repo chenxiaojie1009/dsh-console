@@ -27,7 +27,7 @@ DSH（DeepSeek Harness）插件：把 **串口调试** 和 **SSH 登录** 变成
 ```powershell
 # 1. 解压 dsh-console-<version>.zip 到任意目录
 # 2. 安装到目标 profile（默认桌面版 profile 名为 desktop）
-dsh plugin --profile desktop add "file:G:\path\to\dsh-console-1.4.0.tgz"
+dsh plugin --profile desktop add "file:G:\path\to\dsh-console-1.4.2.tgz"
 # 3. 重启 DSH 桌面端
 ```
 
@@ -44,7 +44,7 @@ dsh plugin --profile desktop add "file:G:\path\to\dsh-console-1.4.0.tgz"
 ### 方式 C：从 GitHub 安装
 
 ```powershell
-dsh plugin --profile desktop add "https://github.com/chenxiaojie1009/dsh-console/releases/download/v1.4.0/dsh-console-1.4.0.tgz"
+dsh plugin --profile desktop add "https://github.com/chenxiaojie1009/dsh-console/releases/download/v1.4.2/dsh-console-1.4.2.tgz"
 ```
 
 或从 [Releases](https://github.com/chenxiaojie1009/dsh-console/releases) 下载 tgz 后用方式 A 安装；源码安装：`dsh plugin --profile desktop add "github:chenxiaojie1009/dsh-console"`（需要本地编译 `serialport`，较慢）。

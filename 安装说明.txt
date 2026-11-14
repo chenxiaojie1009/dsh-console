@@ -16,13 +16,13 @@ DSH 执行的每条命令都会实时显示在面板里并附中文注释，可�
    .\install.ps1 -Profile <profile名>
 
    安装脚本实际执行：
-   dsh plugin --profile desktop add "file:<解压目录>\dsh-console-1.4.0.tgz"
+   dsh plugin --profile desktop add "file:<解压目录>\dsh-console-1.4.2.tgz"
 
 3. 重启 DSH 桌面端（必须重启一次，让新插件加载）。
 4. 左侧边栏底部出现「设备控制台」入口，点开即可使用。
 
 如果你更愿意让 DSH 自己装：把「让 DSH 安装这个插件」告诉另一台 DSH 的对话，
-并把 dsh-console-1.4.0.tgz 的路径给它，让它用 plugin_manager 的 install_bundle 安装。
+并把 dsh-console-1.4.2.tgz 的路径给它，让它用 plugin_manager 的 install_bundle 安装。
 注意：install_bundle 直接指向“目录”时是 pnpm link，不会安装依赖；
 指向 .tgz 才会连同 serialport / ssh2 一起装好，推荐 tgz。
 
@@ -72,7 +72,7 @@ dsh plugin --profile desktop remove dsh-console
 
 五、文件说明
 ------------
-dsh-console-1.4.0.tgz  插件包（真正被安装的东西）
+dsh-console-1.4.2.tgz  插件包（真正被安装的东西）
 install.ps1            一键安装脚本
 README.md              完整文档（功能、工具、安全说明、排错）
 source\                插件源码（可修改后重新打包）
