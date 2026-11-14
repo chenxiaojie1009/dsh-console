@@ -86,6 +86,14 @@ window.__ModuleLoader__.load({
       'pending.cancel': '取消',
       'pending.ran': '命令已执行，输出和 DSH 的解读会出现在右侧终端。',
       'pending.cancelled': '已取消该命令。',
+      'vendor.label': '厂商',
+      'vendor.auto': '自动识别 / 未识别',
+      'vendor.promptTitle': '未识别交换机厂商',
+      'vendor.promptBody': '请在右上角「厂商」下拉选择品牌（华为 / H3C / 思科 / 锐捷 / TP-Link / Juniper / MikroTik）；设备回显后也会自动识别。选择后只会给出该厂商的命令。',
+      'vendor.refTitle': '厂商命令参考',
+      'vendor.refHint': '点「填入」把命令放到下面的输入框，确认后再发送；命令语法固定为该厂商，不会混用。',
+      'vendor.fill': '填入',
+      'vendor.set': '厂商已更新。',
       'side.hint': '不知道命令也没关系：写需求让 DSH 给命令。也可以直接在右侧终端输入框手打命令（手打命令会立即发送）。',
       'busy': '处理中…',
       'error': '错误：',
@@ -141,6 +149,14 @@ window.__ModuleLoader__.load({
       'term.explain': 'Explanation',
       'term.requirement': 'Request',
       'term.suggestion': 'Suggestion',
+      'vendor.label': 'Vendor',
+      'vendor.auto': 'Auto / unknown',
+      'vendor.promptTitle': 'Switch vendor not detected',
+      'vendor.promptBody': 'Pick the vendor in the header selector (Huawei / H3C / Cisco / Ruijie / TP-Link / Juniper / MikroTik); the device echo is also detected automatically. Commands will follow that vendor only.',
+      'vendor.refTitle': 'Vendor command reference',
+      'vendor.refHint': 'Click Fill to put the command in the input, then send it yourself. Syntax stays within this vendor.',
+      'vendor.fill': 'Fill',
+      'vendor.set': 'Vendor updated.',
       'ask.title': 'Tell DSH what you want',
       'ask.placeholder': 'For example: how much memory is left on the NAS?',
       'ask.button': 'Ask DSH for commands',
@@ -191,7 +207,7 @@ window.__ModuleLoader__.load({
 .dc-banner{border:1px solid var(--dsw-alias-state-warn-primary);border-radius:8px;padding:8px 10px;background:var(--dsw-alias-bg-layer-2);display:flex;flex-direction:column;gap:4px}
 .dc-banner strong{color:var(--dsw-alias-state-warn-primary);font-size:12px}
 .dc-banner .dc-hint{font-size:12px}
-.dc-term{flex:1;min-height:160px;overflow:auto;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-layer-2);padding:10px 12px;font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;font-size:12.5px;line-height:1.55}
+.dc-term{flex:1;min-height:160px;overflow:auto;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-layer-2);padding:10px 12px;font-family:ui-monospace,"Cascadia Mono",Consolas,"Microsoft YaHei Mono","Microsoft YaHei",monospace;font-size:12.5px;line-height:1.55;tab-size:8;font-variant-ligatures:none}
 .dc-body{display:grid;grid-template-columns:minmax(250px,340px) minmax(0,1fr);gap:10px;flex:1;min-height:0}
 .dc-side{display:flex;flex-direction:column;gap:8px;min-height:0;overflow:auto}
 .dc-main{display:flex;flex-direction:column;gap:8px;min-height:0}
@@ -205,6 +221,10 @@ window.__ModuleLoader__.load({
 .dc-pending-cmd{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12.5px;color:var(--dsw-alias-label-primary);word-break:break-word}
 .dc-pending-note{font-size:12px;color:var(--dsw-alias-state-success-primary);font-style:italic;word-break:break-word}
 .dc-actions{display:flex;gap:6px;margin-top:2px}
+.dc-vendor-row{display:flex;align-items:center;gap:6px;padding:3px 0;border-top:1px dashed var(--dsw-alias-border-l1);font-size:12px}
+.dc-vendor-row:first-of-type{border-top:none}
+.dc-vendor-label{color:var(--dsw-alias-label-secondary);white-space:nowrap}
+.dc-vendor-cmd{flex:1;font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--dsw-alias-label-primary);word-break:break-all}
 .dc-req{color:var(--dsw-alias-brand-primary);font-style:italic}
 .dc-sugg{color:var(--dsw-alias-brand-primary);font-style:italic;opacity:.9}
 @media (max-width: 860px){
@@ -218,7 +238,7 @@ window.__ModuleLoader__.load({
 .dc-note{color:var(--dsw-alias-state-success-primary);font-style:italic}
 .dc-expl{color:var(--dsw-alias-state-success-primary);font-style:italic;margin:2px 0 4px 12px}
 .dc-expl .dc-expl-tag{font-style:normal;font-weight:600;margin-right:6px;opacity:.9}
-.dc-out{color:var(--dsw-alias-label-primary);opacity:.92}
+.dc-out{color:var(--dsw-alias-label-primary);opacity:.92;white-space:pre;word-break:normal;overflow-wrap:normal}
 .dc-sys{color:var(--dsw-alias-label-secondary);font-style:italic}
 .dc-err{color:var(--dsw-alias-state-error-primary)}
 .dc-empty{color:var(--dsw-alias-label-secondary);font-style:italic}
@@ -395,7 +415,7 @@ details.dc-adv summary{cursor:pointer;font-size:12px;color:var(--dsw-alias-label
       const [askText, setAskText] = useState('')
       const [askBusy, setAskBusy] = useState(false)
       const [pendingBusyId, setPendingBusyId] = useState(null)
-      const [serialForm, setSerialForm] = useState({ port: '', baudRate: '115200' })
+      const [serialForm, setSerialForm] = useState({ port: '', baudRate: '9600' })
       const [sshForm, setSshForm] = useState({
         alias: '',
         host: '',
@@ -561,6 +581,17 @@ details.dc-adv summary{cursor:pointer;font-size:12px;color:var(--dsw-alias-label
       const sendEnter = useCallback(() => sendKey('\\r', '回车 (Enter)', '面板发送回车'), [sendKey])
 
       const sendSpace = useCallback(() => sendKey(' ', '空格 (Space)', '面板发送空格'), [sendKey])
+
+      /** Apply the manual vendor selection. */
+      const applyVendor = useCallback(
+        id => {
+          setNotice(null)
+          request('/vendor', { method: 'POST', body: JSON.stringify({ id }) })
+            .then(() => setNotice({ kind: 'ok', text: t('vendor.set') }))
+            .catch(error => setNotice({ kind: 'error', text: t('error') + messageOf(error) }))
+        },
+        [t],
+      )
 
       const clearTranscript = useCallback(() => {
         void run(async () => {
@@ -955,6 +986,22 @@ details.dc-adv summary{cursor:pointer;font-size:12px;color:var(--dsw-alias-label
             h(
               'label',
               { className: 'dc-check' },
+              h('span', null, t('vendor.label')),
+              h(
+                'select',
+                {
+                  className: 'dc-select',
+                  style: { width: '180px' },
+                  value: view.vendor && view.vendor.id !== 'unknown' ? view.vendor.id : 'unknown',
+                  onChange: event => applyVendor(event.target.value === 'unknown' ? '' : event.target.value),
+                },
+                h('option', { value: 'unknown' }, t('vendor.auto')),
+                (view.vendors ?? []).map(vendor => h('option', { key: vendor.id, value: vendor.id }, vendor.label)),
+              ),
+            ),
+            h(
+              'label',
+              { className: 'dc-check' },
               h('input', { type: 'checkbox', checked: autoScroll, onChange: event => setAutoScroll(event.target.checked) }),
               t('term.autoscroll'),
             ),
@@ -975,6 +1022,31 @@ details.dc-adv summary{cursor:pointer;font-size:12px;color:var(--dsw-alias-label
           h(
             'div',
             { className: 'dc-side' },
+            connected && view.vendor && view.vendor.id === 'unknown'
+              ? h(
+                  'div',
+                  { className: 'dc-card dc-pending-card' },
+                  h('div', { className: 'dc-pending-head' }, t('vendor.promptTitle')),
+                  h('div', { className: 'dc-hint' }, t('vendor.promptBody')),
+                )
+              : null,
+            view.vendor && view.vendor.id !== 'unknown' && (view.vendorCommands ?? []).length > 0
+              ? h(
+                  'div',
+                  { className: 'dc-card' },
+                  h('div', { className: 'dc-ask-title' }, t('vendor.refTitle') + ' · ' + view.vendor.short),
+                  (view.vendorCommands ?? []).map(row =>
+                    h(
+                      'div',
+                      { key: row.key, className: 'dc-vendor-row' },
+                      h('span', { className: 'dc-vendor-label' }, row.label),
+                      h('code', { className: 'dc-vendor-cmd' }, row.command),
+                      h('button', { type: 'button', className: 'dc-btn', onClick: () => setInput(row.command) }, t('vendor.fill')),
+                    ),
+                  ),
+                  h('div', { className: 'dc-hint' }, t('vendor.refHint')),
+                )
+              : null,
             h(
               'div',
               { className: 'dc-card dc-askcard' },

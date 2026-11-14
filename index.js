@@ -24,6 +24,7 @@ const CONSOLE_TOOL_NAMES = [
   'console_ssh_connect',
   'console_exec',
   'console_note',
+  'console_vendor',
   'console_send',
   'console_read',
   'console_disconnect',
@@ -38,6 +39,7 @@ export const CONSOLE_GUIDANCE = `本机已安装「设备控制台」插件（DS
 - console_ssh_connect：请求用户在面板输入密码连接 SSH。密码只能由用户在面板输入，你绝不能索要、猜测或在聊天里传递密码。
 - console_exec：在已连接设备上提交并执行一条命令。必须传 note（简短中文注释，说明这条命令做什么），它会显示在面板命令行旁边。
 - console_note：给刚执行完的命令输出补一条中文解读，显示在面板对应输出的下面（只展示，不向设备发送数据）。
+- console_vendor：查看或设置交换机厂商（huawei / h3c / cisco / ruijie / tplink / juniper / mikrotik）。设定或识别厂商后，命令必须使用该厂商语法，禁止混用。
 - console_send：发送原始输入（Ctrl+C、方向键、单独回车等），支持 \\r \\n \\x03 转义。
 - console_read：读取终端缓冲区（命令、注释、输出、输出解读）。
 - console_disconnect：断开连接。
@@ -48,12 +50,13 @@ export const CONSOLE_GUIDANCE = `本机已安装「设备控制台」插件（DS
 3. 「执行前确认」默认开启：console_exec 会返回 status=awaiting-confirmation，表示命令已进入面板待确认区、还没有发到设备。此时不要重复提交同一条命令，也不要调用 console_note，可以在聊天里告诉用户「命令已给出，请在面板点执行」。
 4. 用户点「执行」后，插件会自动生成输出解读；如果用户还在对话里要求你继续分析，用 console_read 读记录后再回答。
 5. 面板左侧的需求由插件内模型直接处理，不经过聊天；只有用户直接在聊天或工具调用里找你时，你才参与设备操作。
-6. 命令要小而可验证：先给一条、等确认执行和解读，再决定下一步；不要把多条命令用 && 堆在一起，除非用户明确要求。
-7. 若 console_exec 返回 status 为 paused，说明用户按了暂停：立即停止，不要重试、不要继续下一条命令，等待用户新的指令；用户恢复后按新需求继续。
-8. 设备输出可能为空或超时，如实说明，绝不编造输出或猜测设备状态。
-9. 本机（DSH 所在电脑）上的文件和命令仍用本地工具（read/write/pwsh 等）；设备控制台只用于串口设备或 SSH 目标机。
-10. 面板里也可能出现用户手动输入的命令，不要重复执行或擅自续做。
-11. console_ssh_connect 超时或失败时，提醒用户打开左侧「设备控制台」面板，选择主机并输入密码后点「连接」。`
+6. 交换机场景遵守厂商：先看 console_status 返回的「交换机厂商」；未识别时先让用户在面板右上角「厂商」选择，或先执行该厂商的版本命令确认；已识别后只给该厂商语法的命令，不确定的命令先查该厂商帮助，绝不混用其他厂商命令。
+7. 命令要小而可验证：先给一条、等确认执行和解读，再决定下一步；不要把多条命令用 && 堆在一起，除非用户明确要求。
+8. 若 console_exec 返回 status 为 paused，说明用户按了暂停：立即停止，不要重试、不要继续下一条命令，等待用户新的指令；用户恢复后按新需求继续。
+9. 设备输出可能为空或超时，如实说明，绝不编造输出或猜测设备状态。
+10. 本机（DSH 所在电脑）上的文件和命令仍用本地工具（read/write/pwsh 等）；设备控制台只用于串口设备或 SSH 目标机。
+11. 面板里也可能出现用户手动输入的命令，不要重复执行或擅自续做。
+12. console_ssh_connect 超时或失败时，提醒用户打开左侧「设备控制台」面板，选择主机并输入密码后点「连接」。`
 
 /**
  * Mount the console engine, routes, tools and guidance.

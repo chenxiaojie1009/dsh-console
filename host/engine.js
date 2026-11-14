@@ -9,12 +9,13 @@
 import { StringDecoder } from 'node:string_decoder'
 import { readFile } from 'node:fs/promises'
 import { ConsoleHub, capText, clean, sleep } from './hub.js'
+import { UNKNOWN_VENDOR, detectVendor, listVendors, vendorById, vendorReference } from './vendors.js'
 import { SerialConnection, listSerialPorts } from './serial.js'
 import { SshConnection } from './ssh.js'
 import { listSshHosts, savedPassword } from './ssh-hosts.js'
 
-/** Default serial parameters. */
-const DEFAULT_BAUD = 115200
+/** Default serial parameters (switch console ports usually run 9600 8N1). */
+const DEFAULT_BAUD = 9600
 /** Default command completion window (ms). */
 const DEFAULT_WAIT_MS = 8000
 /** Default quiet window that marks a command completed (ms). */
@@ -35,7 +36,9 @@ const SUGGEST_SYSTEM = `你是「设备控制台」里的串口/SSH 命令助手
 2. 安装/删除/重启等修改性命令要单独给出，并在 note 里写明会做什么。
 3. 不要编造输出；不知道的信息不要假设，用命令去查。
 4. note 是一句简短中文，说明这条命令的目的。
-5. 需求不适合用命令完成、或缺少关键信息时，输出 []（空数组），不要输出其它文字。`
+5. 需求不适合用命令完成、或缺少关键信息时，输出 []（空数组），不要输出其它文字。
+6. 当前连接是交换机（串口 Console / SSH）时：必须使用上下文里给出的厂商命令语法，禁止混用其他厂商命令；厂商未识别时不要猜，输出 [] 并让用户先在面板选择厂商。
+7. 给交换机命令前，先用该厂商的查看版本命令确认型号（如 display version / show version），再给下一步命令。`
 
 /** System prompt for explaining one command's output. */
 const EXPLAIN_SYSTEM =
@@ -145,6 +148,10 @@ export class ConsoleEngine {
     this.cancelAgentTurn = () => {}
     /** Model completion used by the panel's requirement/explanation features (wired by index.js). */
     this.complete = async () => ''
+    /** Selected or detected switch vendor: { id, source } with source 'auto' | 'manual'. */
+    this.vendor = { id: null, source: null }
+    /** Throttle timestamp for passive vendor detection. */
+    this.vendorScanAt = 0
   }
 
   /**
@@ -202,7 +209,72 @@ export class ConsoleEngine {
       paused: this.hub.paused,
       pending: this.hub.pending,
       lastAgentSessionId: this.hub.lastAgentSessionId,
+      vendor: this.vendorInfo(),
     }
+  }
+
+  /**
+   * Selectable vendor rows for the panel and tools.
+   * @returns {Array<{id:string,label:string,short:string}>} vendors.
+   */
+  listVendorOptions() {
+    return listVendors()
+  }
+
+  /**
+   * Current vendor snapshot for status, panel and model context.
+   * @returns {{id:string,label:string,short:string,source:string|null}} vendor info.
+   */
+  vendorInfo() {
+    const vendor = vendorById(this.vendor.id)
+    if (vendor === undefined) {
+      return { id: UNKNOWN_VENDOR.id, label: UNKNOWN_VENDOR.label, short: UNKNOWN_VENDOR.short, source: this.vendor.source }
+    }
+    return { id: vendor.id, label: vendor.label, short: vendor.short, source: this.vendor.source }
+  }
+
+  /**
+   * Select the switch vendor manually, or clear it for auto-detection.
+   * @param {string} id vendor id, or '' / 'auto' to clear.
+   * @returns {object} status.
+   */
+  setVendor(id) {
+    const value = String(id ?? '')
+    if (value === '' || value === 'auto') {
+      this.vendor = { id: null, source: null }
+      this.hub.appendSystem('已切换为自动识别交换机厂商。')
+      this.maybeDetectVendor(true)
+      return this.status()
+    }
+    const vendor = vendorById(value)
+    if (vendor === undefined) throw new Error(`未知厂商：${value}`)
+    this.vendor = { id: vendor.id, source: 'manual' }
+    this.hub.appendSystem(`交换机厂商已设为：${vendor.label}（之后的命令使用该厂商语法）。`)
+    return this.status()
+  }
+
+  /**
+   * Passive vendor detection from recent device echo (banners, version output,
+   * prompts), throttled so a noisy console does not rescan on every chunk.
+   * @param {boolean} [force] run even inside the throttle window.
+   * @returns {void}
+   */
+  maybeDetectVendor(force = false) {
+    const now = Date.now()
+    if (!force && now - this.vendorScanAt < 1500) return
+    this.vendorScanAt = now
+    if (this.vendor.source === 'manual') return
+    const tail = this.hub.entries
+      .filter(entry => entry.kind === 'output')
+      .slice(-80)
+      .map(entry => entry.text)
+      .join('\n')
+      .slice(-6000)
+    const found = detectVendor(tail)
+    if (found === undefined) return
+    if (this.vendor.id === found.id) return
+    this.vendor = { id: found.id, source: 'auto' }
+    this.hub.appendSystem(`已自动识别交换机厂商：${found.label}。请确认；如不正确，请在面板右上角「厂商」手动选择。`)
   }
 
   /**
@@ -258,6 +330,8 @@ export class ConsoleEngine {
     this.hub.appendSystem(
       `已连接串口 ${meta.path}（${meta.baudRate} baud, ${meta.dataBits}${meta.parityLetter}${meta.stopBits}）。`,
     )
+    this.vendor = { id: null, source: null }
+    this.hub.appendSystem('请在面板右上角「厂商」选择交换机品牌；设备回显后也会自动识别。')
     return this.status()
   }
 
@@ -375,6 +449,8 @@ export class ConsoleEngine {
       meta: { host, port, username, alias },
     })
     this.hub.appendSystem(`已连接 SSH ${username}@${host}:${port}。`)
+    this.vendor = { id: null, source: null }
+    this.hub.appendSystem('请在面板右上角「厂商」选择交换机品牌；设备回显后也会自动识别。')
     return this.status()
   }
 
@@ -388,7 +464,10 @@ export class ConsoleEngine {
     this.hub.lastOutputAt = Date.now()
     connection.onData(chunk => {
       const text = this.decoder.write(chunk)
-      if (text !== '') this.hub.appendOutput(clean(text))
+      if (text !== '') {
+        this.hub.appendOutput(clean(text))
+        this.maybeDetectVendor()
+      }
     })
     connection.onClose(() => {
       this.hub.clearSession('连接已断开。')
@@ -416,6 +495,7 @@ export class ConsoleEngine {
       if (!silent) this.hub.clearSession('已断开连接。')
     }
     if (silent && this.hub.session !== null) this.hub.session = null
+    this.vendor = { id: null, source: null }
     this.hub.setPending(null)
   }
 
@@ -587,6 +667,13 @@ export class ConsoleEngine {
         ? `当前连接：${session.kind === 'serial' ? '串口' : 'SSH'} ${session.label}`
         : '当前连接：未连接设备（除非需求是连接设备，否则先提示用户连接）',
     ]
+    const vendor = this.vendorInfo()
+    if (vendor.id === UNKNOWN_VENDOR.id) {
+      lines.push('交换机厂商：未识别。涉及交换机命令时先让用户在面板右上角「厂商」选择品牌，不要猜厂商命令。')
+    } else {
+      const reference = vendorReference(vendor.id).slice(0, 4).map(row => row.command).join(' / ')
+      lines.push(`交换机厂商：${vendor.label}。必须使用该厂商命令语法（例如 ${reference}），禁止混用其他厂商命令。`)
+    }
     const tail = this.hub.renderTail(15)
     if (tail !== '') lines.push('最近终端记录：\n' + tail.slice(-3000))
     return lines.join('\n')
@@ -743,6 +830,9 @@ export class ConsoleEngine {
       ports,
       portsError: this.portsError ?? null,
       sshHosts: hosts,
+      vendor: this.vendorInfo(),
+      vendors: listVendors(),
+      vendorCommands: vendorReference(this.vendor.id),
       entries,
     }
   }

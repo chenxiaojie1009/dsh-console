@@ -5,7 +5,7 @@
 
 DSH（DeepSeek Harness）插件：把 **串口调试** 和 **SSH 登录** 变成 DSH 里可看、可控的「设备控制台」。
 
-面板路径：左侧边栏底部 →「设备控制台」。面板是左右分栏：**左边**是「告诉 DSH 你想做什么」的需求框和「待确认命令」，**右边**是实时终端（命令、中文注释、设备输出、输出解读）。需要改需求时点「暂停 DSH」，当前操作会立刻中断，改完点「继续」再让 DSH 按新要求执行。不想记命令也没关系：写清目的让 DSH 给命令，命令默认要你点「执行」才会发到设备。
+面板路径：左侧边栏底部 →「设备控制台」。面板是左右分栏：**左边**是「告诉 DSH 你想做什么」的需求框和「待确认命令」，**右边**是实时终端（命令、中文注释、设备输出、输出解读）。串口默认 **9600 8N1**（交换机 Console 口常用）；交换机场景可先选厂商（华为 / H3C / 思科 / 锐捷 / TP-Link / Juniper / MikroTik），或连接后由设备回显自动识别，识别后只会给出该厂商语法的命令。需要改需求时点「暂停 DSH」，当前操作会立刻中断，改完点「继续」再让 DSH 按新要求执行。不想记命令也没关系：写清目的让 DSH 给命令，命令默认要你点「执行」才会发到设备。
 
 ## 功能
 
@@ -18,6 +18,7 @@ DSH（DeepSeek Harness）插件：把 **串口调试** 和 **SSH 登录** 变成
 | ⑤ 修改需求可暂停 | 「暂停 DSH」按钮会中断 DSH 当前这一轮操作（cancel 当前会话 turn），命令执行也会立即返回 `paused`；点「继续」后按新需求继续 |
 | ⑥ 可打包到其他 DSH | 产物是一份 npm 包（`.tgz`）+ 安装脚本；其他 DSH 上一条命令安装 |
 | ⑦ 不用记命令 | 面板左侧写「我想做什么」→ 点「让 DSH 给出命令」→ **插件内模型直接生成命令（不经过聊天）**进入「待确认命令」→ 你点「执行」才真正发到设备，点「取消」则不执行；执行后插件内模型自动补输出解读。右上角「执行前确认」可关闭（关闭后命令直接执行） |
+| ⑧ 交换机厂商 | 右上角「厂商」下拉可选华为 / H3C / 思科 / 锐捷 / TP-Link / Juniper / MikroTik，也可留「自动识别」由设备回显判断；未识别会在左侧提示选择。选定厂商后，左侧显示该厂商命令参考（查看版本/接口/MAC/路由/配置/保存），模型只会给该厂商语法的命令，不会混用 |
 
 ## 安装（本机或另一台 DSH）
 
@@ -26,7 +27,7 @@ DSH（DeepSeek Harness）插件：把 **串口调试** 和 **SSH 登录** 变成
 ```powershell
 # 1. 解压 dsh-console-<version>.zip 到任意目录
 # 2. 安装到目标 profile（默认桌面版 profile 名为 desktop）
-dsh plugin --profile desktop add "file:G:\path\to\dsh-console-1.3.2.tgz"
+dsh plugin --profile desktop add "file:G:\path\to\dsh-console-1.4.0.tgz"
 # 3. 重启 DSH 桌面端
 ```
 
@@ -43,7 +44,7 @@ dsh plugin --profile desktop add "file:G:\path\to\dsh-console-1.3.2.tgz"
 ### 方式 C：从 GitHub 安装
 
 ```powershell
-dsh plugin --profile desktop add "https://github.com/chenxiaojie1009/dsh-console/releases/download/v1.3.2/dsh-console-1.3.2.tgz"
+dsh plugin --profile desktop add "https://github.com/chenxiaojie1009/dsh-console/releases/download/v1.4.0/dsh-console-1.4.0.tgz"
 ```
 
 或从 [Releases](https://github.com/chenxiaojie1009/dsh-console/releases) 下载 tgz 后用方式 A 安装；源码安装：`dsh plugin --profile desktop add "github:chenxiaojie1009/dsh-console"`（需要本地编译 `serialport`，较慢）。
@@ -57,7 +58,7 @@ dsh plugin --profile desktop remove dsh-console
 ## 使用流程
 
 1. 打开左侧边栏底部「设备控制台」。
-2. **串口**：选择 COM 口与波特率（默认 115200 8N1）→ 点「连接」。
+2. **串口**：选择 COM 口与波特率（默认 **9600 8N1**，交换机 Console 口常用；也可以切 115200 等）→ 点「连接」。连接后在右上角「厂商」选择交换机品牌，或等设备回显自动识别；左侧会出现该厂商的命令参考，点「填入」把命令放进输入框再发送。
 3. **SSH**：选已配置主机（来自 DSH 的 `dsh-ssh.json`）或手动填主机/端口/用户名 → 输入密码 → 点「连接」。若该主机在 DSH 里存过密码，可勾选「使用已保存的密码」。
 4. **不想记命令时（推荐）**：在面板左侧「告诉 DSH 你想做什么」里写目的，例如「看看 NAS 内存还剩多少」「查一下串口设备支持哪些命令」→ 点「让 DSH 给出命令」。
    - 这一步直接调用本机 DSH 配置的模型生成命令，**不经过聊天会话**，思考结果只出现在面板里；
@@ -84,7 +85,7 @@ dsh plugin --profile desktop remove dsh-console
 | 工具 | 作用 |
 |---|---|
 | `console_status` | 连接状态、是否暂停、可用串口、已配置 SSH 主机、最近输出 |
-| `console_serial_connect` | 连接串口（无密码；可自动选口，默认 115200 8N1） |
+| `console_serial_connect` | 连接串口（无密码；可自动选口，默认 9600 8N1） |
 | `console_ssh_connect` | 请求用户在面板输入密码连接 SSH（模型不接触密码） |
 | `console_exec` | 提交一条命令；「执行前确认」开启时只进入面板待确认区（`status=awaiting-confirmation`），用户点「执行」后才真正发送。`note` 必填，是命令旁的中文注释 |
 | `console_note` | 给刚执行完的命令输出补一条中文「解读」，显示在面板对应输出下面；只做展示，不发送数据 |

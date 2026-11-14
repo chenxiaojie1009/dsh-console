@@ -1,6 +1,6 @@
 {
   "name": "dsh-console",
-  "version": "1.3.2",
+  "version": "1.4.1",
   "description": "设备控制台 for DSH：串口与 SSH 调试面板，面板内模型按需求生成命令、执行前确认、实时中文注释与输出解读，可暂停/恢复，并提供 console_* agent 工具。Device console for DSH: serial/SSH panel with model-generated commands, run confirmation, live Chinese annotations and output explanations.",
   "type": "module",
   "main": "index.js",

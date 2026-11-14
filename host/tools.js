@@ -36,6 +36,7 @@ function renderStatus(value) {
   const lines = []
   lines.push(value.connected ? `连接状态：已连接（${value.kind}）` : '连接状态：未连接')
   if (value.connected) lines.push(`设备：${value.label}`)
+  lines.push(`交换机厂商：${value.vendor}${value.vendorSource === 'auto' ? '（自动识别）' : value.vendorSource === 'manual' ? '（手动选择）' : ''}`)
   lines.push(`暂停状态：${value.paused ? '已暂停（用户要求停下）' : '运行中'}`)
   if (value.pending !== '') lines.push(`待处理：${value.pending}`)
   lines.push('')
@@ -115,6 +116,9 @@ export function makeTools(engine, helpers) {
           connected: { type: 'boolean', required: true },
           kind: { type: 'string', required: true, enum: ['none', 'serial', 'ssh'] },
           label: { type: 'string', required: true },
+          vendor: { type: 'string', required: true },
+          vendorId: { type: 'string', required: true },
+          vendorSource: { type: 'string', required: true },
           paused: { type: 'boolean', required: true },
           pending: { type: 'string', required: true },
           ports: { type: 'array', items: { type: 'string' }, required: true },
@@ -131,10 +135,14 @@ export function makeTools(engine, helpers) {
       const hosts = await engine.listHosts()
       const session = engine.hub.session
       const recent = typeof args.recent === 'number' ? args.recent : 12
+      const vendor = engine.vendorInfo()
       return {
         connected: engine.connected,
         kind: session?.kind ?? 'none',
         label: session?.label ?? '',
+        vendor: vendor.label,
+        vendorId: vendor.id,
+        vendorSource: vendor.source ?? '',
         paused: engine.hub.paused,
         pending: engine.hub.pending === null ? '' : `等待用户连接 SSH ${engine.hub.pending.username}@${engine.hub.pending.host}`,
         ports: ports.map(port => `${port.path}${port.manufacturer ? ` (${port.manufacturer})` : ''}`),
@@ -312,6 +320,48 @@ export function makeTools(engine, helpers) {
     },
   })
 
+  const vendorTool = defineTool({
+    name: 'console_vendor',
+    description:
+      '查看或设置当前连接的交换机厂商。不给 vendor 时返回当前厂商和可选项（huawei/h3c/cisco/ruijie/tplink/juniper/mikrotik）；给 vendor 时手动设定厂商（设为 auto 或空字符串则恢复自动识别）。设定厂商后，所有命令必须使用该厂商的语法，禁止混用其他厂商命令。',
+    parameters: {
+      vendor: { type: 'string', description: '厂商 id：huawei / h3c / cisco / ruijie / tplink / juniper / mikrotik；传 auto 或留空恢复自动识别。' },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          vendor: { type: 'string', required: true },
+          vendorId: { type: 'string', required: true },
+          vendorSource: { type: 'string', required: true },
+          vendors: { type: 'array', items: { type: 'string' }, required: true },
+          message: { type: 'string', required: true },
+        },
+      },
+      render: (_args, value) => text(value.message),
+    },
+    isConcurrencySafe: () => true,
+    async execute(args) {
+      remember()
+      if (args.vendor !== undefined && String(args.vendor) !== '') {
+        engine.setVendor(String(args.vendor))
+      }
+      const vendor = engine.vendorInfo()
+      const options = engine.listVendorOptions().map(row => row.id + '=' + row.label).join(' / ')
+      return {
+        vendor: vendor.label,
+        vendorId: vendor.id,
+        vendorSource: vendor.source ?? '',
+        vendors: engine.listVendorOptions().map(row => row.id),
+        message:
+          `当前厂商：${vendor.label}` +
+          (vendor.source ? `（${vendor.source === 'auto' ? '自动识别' : '手动选择'}）` : '') +
+          `\n可选：${options}`,
+      }
+    },
+  })
+
   const sendTool = defineTool({
     name: 'console_send',
     description:
@@ -428,5 +478,5 @@ export function makeTools(engine, helpers) {
     },
   })
 
-  return [statusTool, serialConnectTool, sshConnectTool, execTool, noteTool, sendTool, readTool, disconnectTool]
+  return [statusTool, serialConnectTool, sshConnectTool, execTool, noteTool, sendTool, readTool, disconnectTool, vendorTool]
 }

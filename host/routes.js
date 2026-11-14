@@ -383,6 +383,24 @@ export function makeRoutes(deps) {
     },
     {
       kind: 'exact',
+      path: `${CONSOLE_API}/vendor`,
+      async handler(request, response) {
+        if (!guard(request, response, 'POST')) return
+        const body = await readJsonBody(request)
+        if (body === null) {
+          writeJson(response, 400, { error: 'invalid JSON body' })
+          return
+        }
+        try {
+          engine.setVendor(body.id === undefined ? '' : String(body.id))
+          writeJson(response, 200, await engine.panelState(engine.hub.seq, { history: false }))
+        } catch (error) {
+          fail(response, error)
+        }
+      },
+    },
+    {
+      kind: 'exact',
       path: `${CONSOLE_API}/ports`,
       async handler(request, response) {
         if (!guard(request, response, 'GET')) return
